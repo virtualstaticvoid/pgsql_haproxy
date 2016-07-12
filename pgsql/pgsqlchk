@@ -1,0 +1,42 @@
+#!/bin/bash
+# /opt/pgsqlchk
+
+function write_status () {
+  /bin/echo -e "HTTP/1.1 ${1}"
+  /bin/echo -e "Content-Type: text/plain;"
+  /bin/echo -e "Pragma: no-cache"
+  /bin/echo -e "Cache-Control: no-cache, no-store, max-age=0, must-revalidate"
+  /bin/echo -e "Expires: Fri, 01 Jan 1990 00:00:00 GMT"
+  /bin/echo -e "Content-length: ${#2}"
+  /bin/echo -e ""
+  /bin/echo -e $2
+}
+
+# See https://www.postgresql.org/docs/9.3/static/app-pg-isready.html
+pg_isready &> /dev/null
+
+# capture return code
+status=$?
+
+#
+# Check the exit code. 0 is succcess
+#
+if [ $status -eq 0 ]
+then
+
+  # Postgres is fine, return http 200
+  write_status "200 OK", "SUCCESS"
+
+else
+
+  # Postgres is down, return http 503
+  #
+  # Failure could be due to:
+  #
+  #  - 1 if the server is rejecting connections (for example during startup),
+  #  - 2 if there was no response to the connection attempt, and
+  #  - 3 if no attempt was made (for example due to invalid parameters).
+  #
+  write_status "503 Service Unavailable", "FAILURE:${status}"
+
+fi

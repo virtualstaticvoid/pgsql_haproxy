@@ -1,0 +1,74 @@
+---
+version: '2'
+
+networks:
+  app_net:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.36.0.0/16
+          ip_range: 172.36.5.16/28  # 16 addresses, starting from 172.36.5.16
+          gateway: 172.36.5.254
+
+volumes:
+  pqsql_data_master: {}
+  pqsql_data_slave1: {}
+  pqsql_data_slave2: {}
+  pqsql_data_archive: {}
+
+services:
+
+  loadbalancer:
+    image: haproxy:1.5
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    networks:
+      app_net:
+        ipv4_address: 172.36.5.1
+    ports:
+      - "5488:5488"
+    depends_on:
+      - postgres_master
+      - postgres_slave1
+      - postgres_slave2
+    links:
+      - postgres_master
+      - postgres_slave1
+      - postgres_slave2
+
+  postgres_master:
+    build:
+      context: pgsql.master
+    volumes:
+      - "pqsql_data_master:/var/lib/postgresql/data/"
+      - "pqsql_data_archive:/var/lib/postgresql/archive/"
+    networks:
+      - app_net
+    env_file:
+      - ".env"
+
+  postgres_slave1:
+    build:
+      context: pgsql.slave
+    volumes:
+      - "pqsql_data_slave1:/var/lib/postgresql/data/"
+      - "pqsql_data_archive:/var/lib/postgresql/archive/"
+    networks:
+      - app_net
+    links:
+      - postgres_master
+    env_file:
+      - ".env"
+
+  postgres_slave2:
+    build:
+      context: pgsql.slave
+    volumes:
+      - "pqsql_data_slave2:/var/lib/postgresql/data/"
+      - "pqsql_data_archive:/var/lib/postgresql/archive/"
+    networks:
+      - app_net
+    links:
+      - postgres_master
+    env_file:
+      - ".env"
